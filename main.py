@@ -1,3 +1,6 @@
+import nest_asyncio
+nest_asyncio.apply() # <-- MUHIM: Render loop'ini buzilishga yo'l qo'ymaydi
+
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -8,10 +11,10 @@ logging.basicConfig(level=logging.INFO)
 VILOYATLAR = {"toshkent": "🚕 Toshkent", "samarqand": "🚕 Samarqand", "surxondaryo": "🚕 Surxondaryo", "pochta": "📮 Pochta"}
 user_viloyat = {}
 KEYWORDS = {
-    "toshkent": ["toshkent ket", "toshkentga bor"],
-    "samarqand": ["samarga ket"],
-    "surxondaryo": ["termiz ket"],
-    "pochta": ["pochta yuborish"]
+    "toshkent": ["toshkent ket", "toshkentga bor", "chilonzor ket"],
+    "samarqand": ["samarga ket", "urqut ket"],
+    "surxondaryo": ["termiz ket", "denov ket", "sherobod ket"],
+    "pochta": ["pochta yuborish", "hujjat yuborish"]
 }
 
 async def start(u: Update, c: ContextTypes.DEFAULT_TYPE):
@@ -21,20 +24,22 @@ async def start(u: Update, c: ContextTypes.DEFAULT_TYPE):
 async def button(u: Update, c: ContextTypes.DEFAULT_TYPE):
     q = u.callback_query; await q.answer()
     user_viloyat[q.from_user.id] = q.data
-    await q.edit_message_text(f"{VILOYATLAR[q.data]} tanlandi")
+    await q.edit_message_text(f"{VILOYATLAR[q.data]} tanlandi. Endi keyword yozing")
 
 async def handle(u: Update, c: ContextTypes.DEFAULT_TYPE):
     uid = u.effective_user.id
-    if uid in user_viloyat and any(kw in u.message.text.lower() for kw in KEYWORDS.get(user_viloyat[uid], [])):
-        await c.bot.send_message(u.effective_chat.id, f"📢 {VILOYATLAR[user_viloyat[uid]]}\n👤 {u.effective_user.first_name}: {u.message.text}")
+    if uid in user_viloyat:
+        matn = u.message.text.lower()
+        if any(kw in matn for kw in KEYWORDS.get(user_viloyat[uid], [])):
+            await c.bot.send_message(u.effective_chat.id, f"📢 {VILOYATLAR[user_viloyat[uid]]}\n👤 {u.effective_user.first_name}: {u.message.text}")
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-    print("Bot ishga tushdi")
-    app.run_polling(close_loop=False) # <-- MUHIM: close_loop=False
+    print("Bot ishga tushdi - nest_asyncio bilan")
+    app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
     main()
