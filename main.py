@@ -2,8 +2,7 @@ import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-
-TOKEN = "TOKENINGNI_SHUYERGA_QOY"
+TOKEN = "8771424495:AAHpZgMFrwqLI2PidDKyW3_kS9L0WDebCbk"
 
 logging.basicConfig(level=logging.INFO)
 VILOYATLAR = {"toshkent": "🚕 Toshkent", "samarqand": "🚕 Samarqand", "surxondaryo": "🚕 Surxondaryo", "pochta": "📮 Pochta"}
