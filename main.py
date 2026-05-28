@@ -1,13 +1,18 @@
-import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+
 TOKEN = "8771424495:AAHpZgMFrwqLI2PidDKyW3_kS9L0WDebCbk"
 
 logging.basicConfig(level=logging.INFO)
 VILOYATLAR = {"toshkent": "🚕 Toshkent", "samarqand": "🚕 Samarqand", "surxondaryo": "🚕 Surxondaryo", "pochta": "📮 Pochta"}
 user_viloyat = {}
-KEYWORDS = {"toshkent": ["toshkent ket", "toshkentga bor"], "samarqand": ["samarga ket"], "surxondaryo": ["termiz ket"], "pochta": ["pochta yuborish"]}
+KEYWORDS = {
+    "toshkent": ["toshkent ket", "toshkentga bor"],
+    "samarqand": ["samarga ket"],
+    "surxondaryo": ["termiz ket"],
+    "pochta": ["pochta yuborish"]
+}
 
 async def start(u: Update, c: ContextTypes.DEFAULT_TYPE):
     kb = [[InlineKeyboardButton(v, callback_data=k)] for k,v in VILOYATLAR.items()]
@@ -23,13 +28,13 @@ async def handle(u: Update, c: ContextTypes.DEFAULT_TYPE):
     if uid in user_viloyat and any(kw in u.message.text.lower() for kw in KEYWORDS.get(user_viloyat[uid], [])):
         await c.bot.send_message(u.effective_chat.id, f"📢 {VILOYATLAR[user_viloyat[uid]]}\n👤 {u.effective_user.first_name}: {u.message.text}")
 
-async def main():
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
     print("Bot ishga tushdi")
-    await app.run_polling()
+    app.run_polling(close_loop=False) # <-- MUHIM: close_loop=False
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
