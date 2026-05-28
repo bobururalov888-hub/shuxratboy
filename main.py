@@ -1,92 +1,66 @@
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, MessageHandler, CommandHandler, filters
-import json, os, asyncio
+import asyncio
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+TOKEN = " 8771424495:AAHpZgMFrwqLI2PidDKyW3_kS9L0WDebCbk"# o‘zingni tokeningni qo‘y
 
-TOKEN = "8771424495:AAHpZgMFrwqL12PidDKyW3_kS9L0WDebCbk"
-USERS_FILE = "users.json"
-MODE_FILE = "modes.json"
+logging.basicConfig(level=logging.INFO)
 
-# Faqat YO‘LOVCHI kalit so‘zlar - 3 ta shahar + tumanlar + Pochta
+VILOYATLAR = {
+    "toshkent": "🚕 Toshkent",
+    "samarqand": "🚕 Samarqand",
+    "surxondaryo": "🚕 Surxondaryo",
+    "pochta": "📮 Pochta"
+}
+
+user_viloyat = {}
+
+# SEN BERGAN KEYWORDLAR
 KEYWORDS = {
     "toshkent": [
-        # Asosiy
-        "taksi kerak toshkent", "toshkentga taksi kerak", "toshkentga mashina kerak",
-        "toshkentga bormoqchiman", "toshkentga ketmoqchiman", "toshkentga ketish kerak",
-        "toshkentga odam qidiryapman", "toshkentga yo‘lovchi qidiryapman",
-
-        # Narx
-        "nechi puldan toshkent", "toshkent narxi qancha", "toshkentga qancha",
-        "toshkentga necha pul", "toshkent arzon bormi", "toshkent narx bilish",
-
-        # Vaqt
+        "toshkent ket", "toshkentga ket", "toshkentga bor", "toshkentga joy", "toshkentga yo‘lovchi",
+        "toshkent taksi kerak", "toshkentga mashina kerak", "toshkentga bormoqchiman",
+        "nechi pul toshkent", "toshkent narxi qancha", "toshkentga qancha", "toshkent necha pul",
+        "toshkent arzon bormi", "toshkent narx bilish", "toshkentga pul qancha",
         "bugun toshkent bormi", "ertaga toshkent bormi", "hozir toshkent bormi",
-        "toshkentga vaqtida ketadimi", "toshkentga tez ketadigan",
-
-        # Joy + holat
-        "toshkentga joy bormi", "toshkentga 1 joy kerak", "toshkentga 2 joy kerak",
-        "toshkentga 3 joy kerak", "toshkentga 4 joy kerak", "toshkentga oila bilan",
-        "toshkentga bola bilan", "toshkentga bagaj bilan",
-
-        # Tumanlar
+        "toshkentga tez ketadigan", "toshkentga vaqtida ketadimi", "toshkentga erta ketish",
+        "toshkentga 1 joy kerak", "toshkentga 2 joy kerak", "toshkentga 3 joy kerak",
+        "toshkentga 4 joy kerak", "toshkentga oila bilan", "toshkentga bola bilan",
+        "toshkentga bagaj bilan", "toshkentga odam qidiryapman", "toshkentga yo‘lovchi bor",
         "chilonzor ket", "chilonzorga toshkent", "yunusobod ket", "yunusobodga taksi kerak",
         "mirzo ulugbek ket", "sergeli ket", "yangihayot ket", "bektemir ket", "mashinasozlar ket"
     ],
 
     "samarqand": [
-        # Asosiy
-        "taksi kerak samarga", "samarqandga taksi kerak", "samarga mashina kerak",
-        "samarqandga bormoqchiman", "samarga ketmoqchiman", "samarqandga ketish kerak",
-        "samarqandga odam qidiryapman", "samarga yo‘lovchi qidiryapman",
-
-        # Narx
-        "nechi puldan samarga", "samarga narxi qancha", "samarqandga qancha",
-        "samarga necha pul", "samarga arzon bormi", "samarga narx bilish",
-
-        # Vaqt
+        "samarga ket", "samarqand ket", "samarga bor", "samarga joy", "samarga yo‘lovchi",
+        "samarga taksi kerak", "samarqandga mashina kerak", "samarqandga bormoqchiman",
+        "nechi pul samarga", "samarga narxi qancha", "samarqandga qancha", "samarga necha pul",
+        "samarga arzon bormi", "samarga narx bilish", "samarga pul qancha",
         "bugun samarga bormi", "ertaga samarga bormi", "hozir samarga bormi",
-        "samarga vaqtida ketadimi", "samarga tez ketadigan",
-
-        # Joy + holat
-        "samarga joy bormi", "samarga 1 joy kerak", "samarga 2 joy kerak",
-        "samarga 3 joy kerak", "samarga oila bilan", "samarga bagaj bilan",
-
-        # Tumanlar
+        "samarga tez ketadigan", "samarga vaqtida ketadimi", "samarga erta ketish",
+        "samarga 1 joy kerak", "samarga 2 joy kerak", "samarga 3 joy kerak", "samarga 4 joy kerak",
+        "samarga oila bilan", "samarga bola bilan", "samarga bagaj bilan",
+        "samarga odam qidiryapman", "samarga yo‘lovchi bor",
         "urqut ket", "kattakorgon ket", "pastdargom ket", "payariq ket", "ishtixon ket",
         "jombay ket", "nurabad ket", "oqdaryo ket", "bulungur ket"
     ],
 
     "surxondaryo": [
-        # Umumiy
-        "taksi kerak surxon", "surxondaryoga taksi kerak", "surxonga mashina kerak",
-        "surxonga bormoqchiman", "surxonga ketish kerak", "surxonga odam qidiryapman",
-        "nechi pul surxon", "surxon narxi qancha", "bugun surxon bormi", "surxonga joy bormi",
-
-        # Termiz
-        "taksi kerak termiz", "termizga taksi kerak", "termizga mashina kerak",
-        "termizga bormoqchiman", "termizga ketish kerak", "termizga odam qidiryapman",
+        "surxon ket", "surxondaryo ket", "surxonga bor", "surxonga joy", "surxonga yo‘lovchi",
+        "surxondaryoga taksi kerak", "surxonga mashina kerak",
+        "termiz ket", "termizga bor", "termizga joy", "termizga taksi kerak", "termizga mashina kerak",
         "nechi pul termiz", "termiz narxi qancha", "termizga qancha", "bugun termiz bormi",
-        "termizga joy bormi", "termizga 1 joy kerak", "termizga 2 joy kerak", "termizga oila bilan",
-
-        # Denov
-        "taksi kerak denov", "denovga taksi kerak", "denovga mashina kerak",
-        "denovga bormoqchiman", "nechi pul denov", "denov narxi qancha", "bugun denov bormi",
-        "denovga joy bormi", "denovga 1 joy kerak",
-
-        # Sherobod
-        "taksi kerak sherobod", "sherobodga taksi kerak", "sherobodga mashina kerak",
-        "nechi pul sherobod", "sherobod narxi qancha", "sherobodga joy bormi",
-
-        # Qumqo‘rg‘on
-        "taksi kerak qumqo‘rg‘on", "qumqorgon ket", "qumqo‘rg‘onga taksi kerak",
-        "nechi pul qumqo‘rg‘on", "qumqo‘rg‘onga joy bormi",
-
-        # Angor, Uzun, Boysun, Sariosiyo
-        "taksi kerak angor", "angorga taksi kerak", "nechi pul angor", "angorga joy bormi",
-        "taksi kerak uzun", "uzunga taksi kerak", "nechi pul uzun",
-        "taksi kerak boysun", "boysunga taksi kerak", "nechi pul boysun",
-        "taksi kerak sariosiyo", "sariosiyoga taksi kerak", "nechi pul sariosiyo",
-
-        # Qolgan tumanlar
+        "termizga 1 joy kerak", "termizga 2 joy kerak", "termizga oila bilan",
+        "denov ket", "denovga bor", "denovga joy", "denovga taksi kerak", "denovga mashina kerak",
+        "nechi pul denov", "denov narxi qancha", "bugun denov bormi", "denovga 1 joy kerak",
+        "sherobod ket", "sherobodga bor", "sherobodga joy", "sherobodga taksi kerak",
+        "nechi pul sherobod", "sherobod narxi qancha", "sherobodga 2 joy kerak",
+        "qumqo‘rg‘on ket", "qumqorgon ket", "qumqo‘rg‘onga bor", "qumqo‘rg‘onga taksi kerak",
+        "nechi pul qumqo‘rg‘on", "qumqo‘rg‘onga joy bor",
+        "angor ket", "angorga bor", "angorga taksi kerak", "nechi pul angor", "angorga joy bor",
+        "uzun ket", "uzunga bor", "uzunga taksi kerak", "nechi pul uzun", "uzunga joy bor",
+        "boysun ket", "boysunga bor", "boysunga taksi kerak", "nechi pul boysun", "boysunga joy bor",
+        "sariosiyo ket", "sariosiyoga bor", "sariosiyoga taksi kerak", "nechi pul sariosiyo",
         "jarqo‘rg‘on ket", "jarqorgon ket", "sho‘rchi ket", "shorchi ket", "oltinsoy ket", "muzrabot ket",
         "nechi pul jarqorgon", "nechi pul shorchi", "muzrabotga taksi kerak"
     ],
@@ -99,95 +73,39 @@ KEYWORDS = {
     ]
 }
 
-def load_json(file):
-    if os.path.exists(file):
-        with open(file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {} if file == MODE_FILE else set()
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton(text, callback_data=key)] for key, text in VILOYATLAR.items()]
+    await update.message.reply_text("Viloyatni tanlang:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-def save_json(file, data):
-    with open(file, "w", encoding="utf-8") as f:
-        json.dump(list(data) if isinstance(data, set) else data, f, ensure_ascii=False, indent=2)
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_viloyat[query.from_user.id] = query.data
+    await query.edit_message_text(f"{VILOYATLAR[query.data]} tanlandi. Endi keyword yozing")
 
-async def start(update: Update, context):
-    user_id = str(update.effective_user.id)
-    users = load_json(USERS_FILE)
-    users.add(int(user_id))
-    save_json(USERS_FILE, users)
-
-    # 5 ta menyu
-    keyboard = [
-        [KeyboardButton("🚕 Toshkent"), KeyboardButton("🏛 Samarqand")],
-        [KeyboardButton("🌴 Surxondaryo"), KeyboardButton("📦 Pochta")],
-        [KeyboardButton("❌ Bekor qilish")]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-
-    text = """Salom! 👋
-Taksi e'lonlarini kuzatuvchi bot.
-
-Faqat yo'lovchi yozgan xabarlar keladi.
-Taksichi "ketamiz" desa kelmaydi.
-
-Qaysi yo'nalishni tanlaysan? 👇"""
-    await update.message.reply_text(text, reply_markup=reply_markup)
-
-async def handle_mode(update: Update, context):
-    user_id = str(update.effective_user.id)
-    text = update.message.text
-    modes = load_json(MODE_FILE)
-
-    rejim_map = {
-        "🚕 Toshkent": "toshkent",
-        "🏛 Samarqand": "samarqand",
-        "🌴 Surxondaryo": "surxondaryo",
-        "📦 Pochta": "pochta"
-    }
-
-    if text in rejim_map:
-        modes[user_id] = rejim_map[text]
-        save_json(MODE_FILE, modes)
-        await update.message.reply_text(f"✅ {text} yoqildi.\nEndi faqat yo'lovchi e'lonlari keladi.")
-
-    elif text == "❌ Bekor qilish":
-        if user_id in modes:
-            del modes[user_id]
-            save_json(MODE_FILE, modes)
-            await update.message.reply_text("❌ Rejim bekor qilindi. Qayta tanla 👇")
-        else:
-            await update.message.reply_text("Sen rejim tanlamagansan.")
-
-async def scan_messages(update: Update, context):
-    if not update.message or not update.message.text:
+async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in user_viloyat:
         return
 
-    msg_text = update.message.text.lower()
-    chat_name = update.effective_chat.title or "Shaxsiy"
-    users = load_json(USERS_FILE)
-    modes = load_json(MODE_FILE)
+    tanlangan = user_viloyat[uid]
+    matn = update.message.text.lower()
 
-    for user_id in users:
-        user_id_str = str(user_id)
-        if user_id_str not in modes:
-            continue
+    # Faqat tanlangan viloyat keywordini tekshiradi
+    if tanlangan in KEYWORDS:
+        if any(kw in matn for kw in KEYWORDS[tanlangan]):
+            viloyat_nomi = VILOYATLAR[tanlangan]
+            ism = update.effective_user.first_name
+            xabar = f"📢 {viloyat_nomi}\n👤 {ism}: {update.message.text}"
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=xabar)
 
-        mode = modes[user_id_str]
-        keywords = KEYWORDS[mode]
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
+    print("Bot ishga tushdi... Keyword filter yoqildi")
+    await app.run_polling()
 
-        for word in keywords:
-            if word in msg_text:
-                rejim_nomi = {"toshkent":"🚕 Toshkent","samarqand":"🏛 Samarqand","surxondaryo":"🌴 Surxondaryo","pochta":"📦 Pochta"}
-                send_text = f"🔍 [{rejim_nomi[mode]}]\nGuruh: {chat_name}\n\n{update.message.text}"
-                try:
-                    await context.bot.send_message(chat_id=user_id, text=send_text)
-                    await asyncio.sleep(0.05)
-                except:
-                    pass
-                break
-
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^(🚕 Toshkent|🏛 Samarqand|🌴 Surxondaryo|📦 Pochta|❌ Bekor qilish)$"), handle_mode))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, scan_messages))
-print("Bot ishga tushdi... Faqat yo'lovchi ushlaydi")
-app.run_polling()
+if __name__ == "__main__":
+    asyncio.run(main())
