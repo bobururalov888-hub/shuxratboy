@@ -2,7 +2,7 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 import json, os, asyncio
 
-TOKEN = "8771424495:AAHpZgMFrwqLI2PidDKyW3_kS9L0WDebCbk"
+TOKEN = "8771424495:AAHpZgMFrwqL12PidDKyW3_kS9L0WDebCbk"
 USERS_FILE = "users.json"
 MODE_FILE = "modes.json"
 
